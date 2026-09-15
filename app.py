@@ -2,19 +2,20 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 import random
-from datetime import datetime, timedelta
-from streamlit_autorefresh import st_autorefresh
+from datetime import datetime
+from streamlit_autorefresh import st_autorefresh  # lo dejamos por si acaso
 
 # ==========================================
 # CONFIGURACIÓN
 # ==========================================
 st.set_page_config(page_title="UNAH Betting", page_icon="⚽", layout="wide")
-st_autorefresh(interval=15000, key="autorefresh")
+
+# ❌ NO usamos st_autorefresh porque rompe la interactividad
 
 DB_PATH = "unah_bets.db"
 
-# ⏰ FECHA Y HORA DEL PARTIDO (cámbiala cuando quieras)
-FECHA_PARTIDO = datetime(2026, 9, 15, 20, 30)  # 15/09/2026 20:30
+# ⏰ FECHA Y HORA DEL PARTIDO
+FECHA_PARTIDO = datetime(2026, 9, 15, 20, 30)
 
 # ==========================================
 # ESTILOS
@@ -105,19 +106,21 @@ st.markdown("""
         font-weight: bold;
         display: inline-block;
     }
-    .player-card {
-        background: linear-gradient(135deg, #4a0e0e 0%, #2d0808 100%);
-        border: 1px solid #d4af37;
-        border-radius: 8px;
-        padding: 10px;
+    .vs-box {
         text-align: center;
-        margin-bottom: 8px;
-    }
-    .player-name {
-        color: #ffd700;
+        font-size: 22px;
         font-weight: bold;
-        font-size: 15px;
-        margin-bottom: 5px;
+        color: #d4af37;
+        padding: 15px 0;
+    }
+    .team-name {
+        font-size: 20px;
+        font-weight: bold;
+        color: #ffd700;
+    }
+    .team-label {
+        font-size: 12px;
+        color: #d4af37;
     }
     .stTabs [data-baseweb="tab-list"] {
         gap: 5px;
@@ -135,22 +138,6 @@ st.markdown("""
         background: linear-gradient(135deg, #d4af37 0%, #b8860b 100%) !important;
         color: #1a0505 !important;
         font-weight: bold;
-    }
-    .vs-box {
-        text-align: center;
-        font-size: 22px;
-        font-weight: bold;
-        color: #d4af37;
-        padding: 15px 0;
-    }
-    .team-name {
-        font-size: 20px;
-        font-weight: bold;
-        color: #ffd700;
-    }
-    .team-label {
-        font-size: 12px;
-        color: #d4af37;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -200,7 +187,7 @@ def tiempo_restante():
 # SESSION STATE
 # ==========================================
 for key, default in [('usuario_id', None), ('usuario_nombre', None),
-                     ('puntos', 0), ('cupon', [])]:
+                     ('puntos', 0), ('cupon', []), ('refresh_key', 0)]:
     if key not in st.session_state:
         st.session_state[key] = default
 
@@ -225,6 +212,11 @@ else:
 choice = st.sidebar.selectbox("Menú", menu)
 st.sidebar.markdown("---")
 st.sidebar.caption(f"🕐 {datetime.now().strftime('%H:%M:%S')}")
+
+# Botón de actualizar cuotas (reemplaza al auto-refresh)
+if st.sidebar.button("🔄 Actualizar cuotas"):
+    st.session_state.refresh_key += 1
+    st.rerun()
 
 # ==========================================
 # FUNCIONES
@@ -281,7 +273,6 @@ if choice == "🏠 Inicio":
 
     st.markdown("### 🔥 Partido destacado")
 
-    # Tarjeta VS
     st.markdown(f"""
     <div class="match-card">
         <div class="match-title">⚽ Reto UNAH - Partido Oficial</div>
@@ -302,20 +293,6 @@ if choice == "🏠 Inicio":
         <p style="text-align: center; color: #d4af37; margin: 5px 0;">
             📅 {FECHA_PARTIDO.strftime('%d/%m/%Y · %H:%M')}
         </p>
-        <div style="display: flex; gap: 8px; margin-top: 10px;">
-            <div class="odd-box" style="flex: 1;">
-                <div class="odd-label">Gana Equipo 90</div>
-                <div class="odd-value">{cuota_viva(1.85)}</div>
-            </div>
-            <div class="odd-box" style="flex: 1;">
-                <div class="odd-label">Empate</div>
-                <div class="odd-value">{cuota_viva(3.20)}</div>
-            </div>
-            <div class="odd-box" style="flex: 1;">
-                <div class="odd-label">Gana Equipo Bajo</div>
-                <div class="odd-value">{cuota_viva(2.10)}</div>
-            </div>
-        </div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -376,12 +353,10 @@ elif choice == "🎯 Apuestas":
     else:
         col_izq, col_der = st.columns([2.2, 1])
 
-        # ---------------- COLUMNA IZQUIERDA ----------------
         with col_izq:
             st.markdown("## 🎯 Apuestas en Vivo")
-            st.caption(f"🔄 Actualización automática · 💰 Saldo: {st.session_state.puntos:.0f} pts")
+            st.caption(f"💰 Saldo: {st.session_state.puntos:.0f} pts · Presiona '🔄 Actualizar cuotas' en el menú lateral")
 
-            # Tarjeta del partido con countdown
             st.markdown(f"""
             <div class="match-card">
                 <div class="match-title">⚽ Equipo 90 vs Equipo Bajo</div>
@@ -389,12 +364,10 @@ elif choice == "🎯 Apuestas":
             </div>
             """, unsafe_allow_html=True)
 
-            # ------------ PESTAÑAS DE MERCADOS ------------
             tab1, tab2, tab3, tab4, tab5 = st.tabs([
                 "🏆 Ganador", "📊 Goles", "⚽ Jugadores", "🎯 Tiros", "🔢 Marcador"
             ])
 
-            # ===== TAB 1: GANADOR =====
             with tab1:
                 st.markdown("### 🏆 Ganador del Partido")
                 c90, cE, cB = cuota_viva(1.85), cuota_viva(3.20), cuota_viva(2.10)
@@ -425,7 +398,6 @@ elif choice == "🎯 Apuestas":
                     if st.button(f"➕ Añadir {primer} como primer goleador", key="add_pg"):
                         añadir_al_cupon("Primer Goleador", primer, cuota_pg)
 
-            # ===== TAB 2: GOLES =====
             with tab2:
                 st.markdown("### 📊 Total de Goles")
                 c_o25, c_u25 = cuota_viva(1.90), cuota_viva(1.95)
@@ -445,7 +417,6 @@ elif choice == "🎯 Apuestas":
                 if col2.button(f"⬇️ Menos de 3.5 ({c_u35})", key="u35", use_container_width=True):
                     añadir_al_cupon("Total Goles", "Under 3.5", c_u35)
 
-            # ===== TAB 3: JUGADORES (GOLES) =====
             with tab3:
                 st.markdown("### ⚽ Goles por Jugador")
                 eq = st.radio("Equipo:", ["Equipo 90", "Equipo Bajo"], horizontal=True, key="eq_goles")
@@ -460,7 +431,6 @@ elif choice == "🎯 Apuestas":
                         if st.button(f"{c_j}", key=f"gol_{jug}", use_container_width=True):
                             añadir_al_cupon(f"Gol de {eq}", jug, c_j)
 
-            # ===== TAB 4: TIROS AL ARCO =====
             with tab4:
                 st.markdown("### 🎯 Tiros al Arco por Jugador")
                 eq_t = st.radio("Equipo:", ["Equipo 90", "Equipo Bajo"], horizontal=True, key="eq_tiros")
@@ -475,7 +445,6 @@ elif choice == "🎯 Apuestas":
                         if st.button(f"{c_t}", key=f"tiro_{jug}", use_container_width=True):
                             añadir_al_cupon(f"Tiro al arco de {eq_t}", jug, c_t)
 
-            # ===== TAB 5: MARCADOR EXACTO =====
             with tab5:
                 st.markdown("### 🔢 Marcador Exacto")
                 marcadores = {
@@ -491,7 +460,6 @@ elif choice == "🎯 Apuestas":
                         if st.button(f"{marc}\n\n{c_m}", key=f"marc_{marc}", use_container_width=True):
                             añadir_al_cupon("Marcador Exacto", marc, c_m)
 
-        # ---------------- COLUMNA DERECHA ----------------
         with col_der:
             st.markdown("### 🎟️ Cupón")
             if not st.session_state.cupon:
@@ -547,6 +515,10 @@ elif choice == "📋 Mis Apuestas":
 # ==========================================
 elif choice == "🚪 Cerrar Sesión":
     st.session_state.usuario_id = None
+    st.session_state.usuario_nombre = None
+    st.session_state.puntos = 0
+    limpiar_cupon()
+    st.rerun()
     st.session_state.usuario_nombre = None
     st.session_state.puntos = 0
     limpiar_cupon()
